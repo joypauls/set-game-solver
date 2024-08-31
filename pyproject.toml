@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "set-game-solver"
+name = "setsolver"
 version = "0.1.0"
 description = ""
 authors = ["joypauls <joypaulsen3@gmail.com>"]
