@@ -122,10 +122,18 @@ for i, flat_card in enumerate(flat_cards):
             # # look for rectangles
             # if len(approx) == 4:
             #     shapes.append(approx)
+    if (len(shapes) > 3) or (len(shapes) < 1):
+        raise ValueError(f"Expected 1-3 shapes, but detected {len(shapes)}")
 
     card_copy = flat_card.copy()
     for shape in shapes:
         cv2.drawContours(card_copy, [shape], -1, (0, 255, 0), 3)
+
+    # CLASSIFY NUMBER
+
+    number_classification = len(shapes)
+
+    # CLASSIFY SHAPE
 
     shape_classifications = []
     for shape in shapes:
@@ -136,6 +144,12 @@ for i, flat_card in enumerate(flat_cards):
             shape_classification = "oval"
         elif len(shape) == 10:
             shape_classification = "squiggle"
+        shape_classifications.append(shape_classification)
+
+    # CLASSIFY COLOR
+    hue = cv2.cvtColor(flat_card, cv2.COLOR_BGR2HSV)[:, :, 0]
+
+    # CLASSIFY SHADING
 
     if len(set(shape_classifications)) > 1:
         raise ValueError(
@@ -146,3 +160,4 @@ for i, flat_card in enumerate(flat_cards):
         card_copy,
         f"Card {i + 1}/{len(flat_cards)} ({len(shapes)}, {shape_classification})",
     )
+    display_image(hue, f"Card {i + 1}/{len(flat_cards)} Hue")
