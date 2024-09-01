@@ -6,6 +6,8 @@ MIN_CARD_AREA = 1000
 MIN_SHAPE_AREA = 50
 # max_area = 5000
 
+REFERENCE_COLORS = {"red": (255, 0, 0), "green": (0, 255, 0), "purple": (128, 0, 128)}
+
 
 def display_image(image, title="Image"):
     cv2.imshow(title, image)
@@ -27,6 +29,21 @@ def order_points(pts):
 
     return rect
 
+
+def classify_color(mean_color_rgb):
+    min_distance = float("inf")
+    classified_color = None
+    for color_name, reference_color in REFERENCE_COLORS.items():
+        # Calculate the Euclidean distance between the mean color and the reference color
+        distance = np.linalg.norm(np.array(mean_color_rgb) - np.array(reference_color))
+        if distance < min_distance:
+            min_distance = distance
+            classified_color = color_name
+
+    return classified_color
+
+
+# MAIN LOGIC
 
 image = cv2.imread("./images/test_image.jpg")
 display_image(image, "Input Image")
@@ -99,15 +116,16 @@ for i, flat_card in enumerate(flat_cards):
     # binarize card
     gray_card = cv2.cvtColor(flat_card, cv2.COLOR_BGR2LUV)[:, :, 0]
     _, binary_card = cv2.threshold(
-        gray_card, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+        gray_card, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
     )
     # display_image(binary_card, "Binary Card")
 
     # countours
     contours, _ = cv2.findContours(
-        cv2.bitwise_not(binary_card), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        binary_card, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
     )
     shapes = []
+    shape_contours = []
     for contour in contours:
         area = cv2.contourArea(contour)
         if MIN_SHAPE_AREA <= area:
@@ -118,6 +136,7 @@ for i, flat_card in enumerate(flat_cards):
             approx = cv2.approxPolyDP(contour, epsilon, True)
 
             shapes.append(approx)
+            shape_contours.append(contour)
 
             # # look for rectangles
             # if len(approx) == 4:
@@ -126,8 +145,8 @@ for i, flat_card in enumerate(flat_cards):
         raise ValueError(f"Expected 1-3 shapes, but detected {len(shapes)}")
 
     card_copy = flat_card.copy()
-    for shape in shapes:
-        cv2.drawContours(card_copy, [shape], -1, (0, 255, 0), 3)
+    for shape_contour in shape_contours:
+        cv2.drawContours(card_copy, [shape_contour], -1, (0, 255, 0), 3)
 
     # CLASSIFY NUMBER
 
@@ -147,7 +166,13 @@ for i, flat_card in enumerate(flat_cards):
         shape_classifications.append(shape_classification)
 
     # CLASSIFY COLOR
-    hue = cv2.cvtColor(flat_card, cv2.COLOR_BGR2HSV)[:, :, 0]
+    kernel = np.ones((3, 3), np.uint8)
+    eroded_shape_mask = cv2.erode(binary_card, kernel, iterations=1)
+
+    # display_image(masked_image, "Masked Image")
+    mean_color = cv2.mean(flat_card, mask=eroded_shape_mask)[:3]
+    mean_color_rgb = (mean_color[2], mean_color[1], mean_color[0])
+    color_classification = classify_color(mean_color_rgb)
 
     # CLASSIFY SHADING
 
@@ -156,8 +181,11 @@ for i, flat_card in enumerate(flat_cards):
             f"Inconsistent shapes detected in card {i + 1}/{len(flat_cards)}"
         )
 
+    # DEBUGGING
+    masked_image = cv2.bitwise_and(flat_card, flat_card, mask=eroded_shape_mask)
+    rounded_mean_color_rgb = tuple(map(int, mean_color_rgb))
     display_image(
-        card_copy,
-        f"Card {i + 1}/{len(flat_cards)} ({len(shapes)}, {shape_classification})",
+        masked_image,
+        f"Card {i + 1}/{len(flat_cards)} ({len(shapes)}, {shape_classification}, {rounded_mean_color_rgb}, {color_classification})",
     )
-    display_image(hue, f"Card {i + 1}/{len(flat_cards)} Hue")
+    # display_image(hue, f"Card {i + 1}/{len(flat_cards)} Hue")
