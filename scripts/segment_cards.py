@@ -12,6 +12,7 @@ def display_image(image, title="Image"):
     cv2.destroyAllWindows()
 
 
+# order points to top-left, top-right, bottom-right, bottom-left
 def order_points(pts):
     rect = np.zeros((4, 2), dtype="float32")
 
@@ -49,15 +50,16 @@ for contour in contours:
         if len(approx) == 4:  # If the polygon has 4 points, it's likely a card
             cards.append(approx)
 
-print(f"Found {len(cards)} cards")
+print(f"Detected {len(cards)} cards")
 
 # draw contours on original image
 image_copy = image.copy()
 for card in cards:
     cv2.drawContours(image_copy, [card], -1, (0, 0, 255), 5)
 
-display_image(image, "Cards with Contours")
+display_image(image_copy, "Cards with Contours")
 
+flat_cards = []
 for i, card in enumerate(cards):
     pts = card.reshape(4, 2)
     rect = order_points(
@@ -84,5 +86,12 @@ for i, card in enumerate(cards):
     M = cv2.getPerspectiveTransform(rect, dst)
     warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
 
+    flat_cards.append(warped)
+
+# display each card after perspective transform
+for i, warped in enumerate(flat_cards):
     # cv2.imwrite(f"card_{i}.jpg", warped)
-    display_image(warped, f"Card {i}")
+    display_image(warped, f"Card {i + 1}/{len(flat_cards)}")
+
+for i, warped in enumerate(flat_cards):
+    pass
