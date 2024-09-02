@@ -6,7 +6,7 @@ MIN_CARD_AREA = 1000
 MIN_SHAPE_AREA = 50
 # max_area = 5000
 
-REFERENCE_COLORS = {"red": (255, 0, 0), "green": (0, 255, 0), "purple": (128, 0, 128)}
+REFERENCE_COLORS = {"red": (255, 0, 0), "green": (0, 255, 0), "purple": (0, 0, 0)}
 
 
 def display_image(image, title="Image"):
@@ -45,7 +45,8 @@ def classify_color(mean_color_rgb):
 
 # MAIN LOGIC
 
-image = cv2.imread("./images/test_image.jpg")
+image = cv2.imread("./images/test_image1.jpg")
+# image = cv2.imread("./images/test_image2.jpg")
 display_image(image, "Input Image")
 
 
@@ -165,27 +166,48 @@ for i, flat_card in enumerate(flat_cards):
             shape_classification = "squiggle"
         shape_classifications.append(shape_classification)
 
+    if len(set(shape_classifications)) > 1:
+        raise ValueError(
+            f"Inconsistent shapes detected in card {i + 1}/{len(flat_cards)}"
+        )
+
     # CLASSIFY COLOR
     kernel = np.ones((3, 3), np.uint8)
     eroded_shape_mask = cv2.erode(binary_card, kernel, iterations=1)
-
+    # background_mask = cv2.bitwise_not(binary_card)
     # display_image(masked_image, "Masked Image")
     mean_color = cv2.mean(flat_card, mask=eroded_shape_mask)[:3]
     mean_color_rgb = (mean_color[2], mean_color[1], mean_color[0])
     color_classification = classify_color(mean_color_rgb)
 
     # CLASSIFY SHADING
-
-    if len(set(shape_classifications)) > 1:
-        raise ValueError(
-            f"Inconsistent shapes detected in card {i + 1}/{len(flat_cards)}"
+    full_shape_mask = np.zeros_like(binary_card, dtype=np.uint8)
+    for shape_contour in shape_contours:
+        cv2.drawContours(
+            full_shape_mask,
+            [shape_contour],
+            -1,
+            color=(255, 255, 255),
+            thickness=cv2.FILLED,
         )
+    num_colored_pixels = np.sum(binary_card == 255)
+    num_shape_pixels = np.sum(full_shape_mask == 255)
+    percent_colored_pixels = num_colored_pixels / num_shape_pixels
+
+    shading_classification = "solid"
+    if percent_colored_pixels < 0.3:
+        shading_classification = "outlined"
+    elif percent_colored_pixels < 0.8:
+        shading_classification = "striped"
 
     # DEBUGGING
-    masked_image = cv2.bitwise_and(flat_card, flat_card, mask=eroded_shape_mask)
+    # masked_image = cv2.bitwise_and(flat_card, flat_card, mask=eroded_shape_mask)
     rounded_mean_color_rgb = tuple(map(int, mean_color_rgb))
+
+    masked_image = cv2.bitwise_and(binary_card, binary_card, mask=full_shape_mask)
+
     display_image(
-        masked_image,
-        f"Card {i + 1}/{len(flat_cards)} ({len(shapes)}, {shape_classification}, {rounded_mean_color_rgb}, {color_classification})",
+        flat_card,
+        f"Card {i + 1}/{len(flat_cards)} ({len(shapes)}, {shape_classification}, {color_classification}, {shading_classification})",
     )
     # display_image(hue, f"Card {i + 1}/{len(flat_cards)} Hue")
